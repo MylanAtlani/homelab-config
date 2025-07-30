@@ -1,0 +1,51 @@
+- name: Tester les chemins de configuration
+  hosts: all
+  gather_facts: yes
+
+  vars:
+    services:
+      traefik: /opt/traefik
+      homarr: /opt/homarr
+      adguard: /opt/adguardhome/conf
+      immich: /opt/immich
+      vaultwarden: /opt/vaultwarden
+      jellyseer: /opt/jellyseer
+      mealie: /opt/mealie
+      grocy: /opt/grocy
+      arrstack: /opt/appdata
+      paperless: /opt/paperless
+      prometheus: /opt/prometheus
+
+  tasks:
+    - name: Vérifier si l'hôte est dans la liste des services
+      debug:
+        msg: "Hôte {{ inventory_hostname }} - Service défini: {{ services[inventory_hostname] is defined }}"
+      when: services[inventory_hostname] is defined
+
+    - name: Vérifier l'existence du dossier de configuration
+      stat:
+        path: "{{ services[inventory_hostname] }}"
+      register: config_path_check
+      when: services[inventory_hostname] is defined
+
+    - name: Afficher le résultat de la vérification
+      debug:
+        msg: "Hôte {{ inventory_hostname }} - Chemin: {{ services[inventory_hostname] }} - Existe: {{ config_path_check.stat.exists }}"
+      when: services[inventory_hostname] is defined
+
+    - name: Lister le contenu du dossier de configuration
+      find:
+        paths: "{{ services[inventory_hostname] }}"
+        patterns: "*.yml,*.yaml,*.toml,*.json,.env,*.ini,*.sh"
+        recurse: yes
+      register: config_files
+      when: 
+        - services[inventory_hostname] is defined
+        - config_path_check.stat.exists
+
+    - name: Afficher les fichiers de configuration trouvés
+      debug:
+        msg: "Hôte {{ inventory_hostname }} - Fichiers trouvés: {{ config_files.files | length }}"
+      when: 
+        - services[inventory_hostname] is defined
+        - config_path_check.stat.exists 

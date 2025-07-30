@@ -15,6 +15,8 @@
       mealie: /opt/mealie
       grocy: /opt/grocy
       arrstack: /opt/appdata
+      paperless: /opt/paperless
+      prometheus: /opt/prometheus
 
     file_patterns:
       - "*.yml"
@@ -54,9 +56,6 @@
         echo "[DEBUG] Dossier de config : {{ config_path }}"
         echo "[DEBUG] Fichiers matchés : {{ file_patterns | join(', ') }}"
 
-        pattern_expr="{% for ext in file_patterns %}-iname '{{ ext }}'{% if not loop.last %} -o {% endif %}{% endfor %}"
-        echo "[DEBUG] Expression de recherche : {{ pattern_expr }}"
-
         echo "[DEBUG] Lancement de la copie..."
         find {{ config_path }} -type f \( {% for ext in file_patterns %} -iname '{{ ext }}'{% if not loop.last %} -o {% endif %}{% endfor %} \) \
           -exec cp --parents {} "$export_dir" \;
@@ -83,33 +82,31 @@
       when:
         - not skip_host | default(false)
 
-
     - name: DEBUG - Affichage sortie de la copie
       debug:
         var: backup_cp_result.stdout_lines
       when: backup_cp_result is defined
 
-    - name: Pause pour inspection manuelle (60 sec)
-      pause:
-        seconds: 60
-      when: not skip_host | default(false)
-
-    - name: Créer une archive locale avec rsync + tar
+    - name: Créer une archive locale avec tar
       shell: |
         export_dir="/home/ansible/backup_{{ service_name }}"
         tmp_archive="/tmp/{{ service_name }}.tar.gz"
-        if [ -d "$export_dir" ]; then
+        if [ -d "$export_dir" ] && [ "$(ls -A $export_dir)" ]; then
           tar -czf "$tmp_archive" -C "$export_dir" .
+          echo "Archive créée: $tmp_archive"
+        else
+          echo "Dossier vide ou inexistant: $export_dir"
         fi
       when: not skip_host | default(false)
 
-    - name: Vérifier que l’archive a bien été créée
+    - name: Vérifier que l'archive a bien été créée
       stat:
         path: "/tmp/{{ service_name }}.tar.gz"
       register: archive_file
       when: not skip_host | default(false)
 
-    - name: Créer le dossier final s’il n’existe pas
+    - name: Créer le dossier final sur le serveur de monitoring
+      delegate_to: localhost
       become: true
       file:
         path: "{{ dest_base }}/{{ service_name }}"
@@ -119,17 +116,27 @@
         - not skip_host | default(false)
         - archive_file.stat.exists
 
-    - name: Extraire l’archive dans le dossier final
+    - name: Copier l'archive vers le serveur de monitoring
+      fetch:
+        src: "/tmp/{{ service_name }}.tar.gz"
+        dest: "{{ dest_base }}/{{ service_name }}/"
+        flat: yes
+      when:
+        - not skip_host | default(false)
+        - archive_file.stat.exists
+
+    - name: Extraire l'archive sur le serveur de monitoring
+      delegate_to: localhost
       become: true
       unarchive:
-        src: "/tmp/{{ service_name }}.tar.gz"
+        src: "{{ dest_base }}/{{ service_name }}/{{ service_name }}.tar.gz"
         dest: "{{ dest_base }}/{{ service_name }}"
         remote_src: true
       when:
         - not skip_host | default(false)
         - archive_file.stat.exists
 
-    - name: Nettoyer les fichiers temporaires
+    - name: Nettoyer les fichiers temporaires sur les hôtes distants
       become: true
       file:
         path: "{{ item }}"
@@ -138,3 +145,13 @@
         - "/tmp/{{ service_name }}.tar.gz"
         - "/home/ansible/backup_{{ service_name }}"
       when: not skip_host | default(false)
+
+    - name: Nettoyer l'archive temporaire sur le serveur de monitoring
+      delegate_to: localhost
+      become: true
+      file:
+        path: "{{ dest_base }}/{{ service_name }}/{{ service_name }}.tar.gz"
+        state: absent
+      when:
+        - not skip_host | default(false)
+        - archive_file.stat.exists
