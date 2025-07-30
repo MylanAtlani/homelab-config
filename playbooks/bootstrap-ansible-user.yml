@@ -1,0 +1,107 @@
+- name: Préparer les machines pour Ansible
+  hosts: bootstrap
+  become: true
+  vars:
+    ansible_user_name: ansible
+    ssh_public_key: "{{ lookup('file', lookup('env', 'HOME') + '/.ssh/id_rsa.pub') }}"
+    sshd_config_path: /etc/ssh/sshd_config
+
+  tasks:
+
+    - name: Créer l'utilisateur ansible
+      user:
+        name: "{{ ansible_user_name }}"
+        shell: /bin/bash
+        create_home: yes
+        groups: sudo
+        state: present
+
+    - name: Installer sudo si manquant
+      package:
+        name: sudo
+        state: present
+
+    - name: Autoriser l'utilisateur ansible à utiliser sudo sans mot de passe
+      copy:
+        dest: "/etc/sudoers.d/{{ ansible_user_name }}"
+        content: "{{ ansible_user_name }} ALL=(ALL) NOPASSWD:ALL\n"
+        owner: root
+        group: root
+        mode: '0440'
+
+    - name: Créer le dossier .ssh pour ansible
+      file:
+        path: "/home/{{ ansible_user_name }}/.ssh"
+        state: directory
+        owner: "{{ ansible_user_name }}"
+        group: "{{ ansible_user_name }}"
+        mode: '0700'
+
+    - name: Copier la clé publique dans authorized_keys
+      copy:
+        dest: "/home/{{ ansible_user_name }}/.ssh/authorized_keys"
+        content: "{{ ssh_public_key }}"
+        owner: "{{ ansible_user_name }}"
+        group: "{{ ansible_user_name }}"
+        mode: '0600'
+
+    - name: Désactiver le login root par SSH
+      lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+        backup: yes
+
+    - name: Désactiver l’authentification par mot de passe
+      lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+        backup: yes
+
+    - name: Restreindre l'accès SSH à l'utilisateur ansible uniquement
+      lineinfile:
+        path: "{{ sshd_config_path }}"
+        regexp: '^AllowUsers'
+        line: "AllowUsers {{ ansible_user_name }}"
+        state: present
+        backup: yes
+
+    - name: Redémarrer le service SSH
+      service:
+        name: ssh
+        state: restarted
+
+    - name: Installer Fail2Ban
+      package:
+        name: fail2ban
+        state: present
+
+    - name: Activer et démarrer Fail2Ban
+      service:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    - name: Configuration basique de jail.local pour SSH
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [sshd]
+          enabled = true
+          port = ssh
+          filter = sshd
+          logpath = /var/log/auth.log
+          maxretry = 5
+          bantime = 1h
+          findtime = 10m
+        mode: '0644'
+      notify: Redémarrer Fail2Ban
+
+  handlers:
+    - name: Redémarrer Fail2Ban
+      service:
+        name: fail2ban
+        state: restarted
