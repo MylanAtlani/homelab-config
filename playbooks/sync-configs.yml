@@ -5,6 +5,11 @@
   vars:
     dest_base: /opt/monitoring/homelab-config/config
 
+    # Services qui sont sur la machine locale (monitoring)
+    local_services:
+      - paperless
+      - prometheus
+
     services:
       traefik: /opt/traefik
       homarr: /opt/homarr
@@ -15,8 +20,9 @@
       mealie: /opt/mealie
       grocy: /opt/grocy
       arrstack: /opt/appdata
-      paperless: /opt/paperless
-      prometheus: /opt/prometheus
+      paperless: /mnt/paperless_data
+      prometheus: /opt/monitoring
+      mealie_grocy: /opt/mealie_grocy
 
     file_patterns:
       - "*.yml"
@@ -38,6 +44,7 @@
       set_fact:
         service_name: "{{ inventory_hostname }}"
         config_path: "{{ services[inventory_hostname] }}"
+        is_local_service: "{{ inventory_hostname in local_services }}"
       when: not skip_host | default(false)
 
     - name: Vérifier que le dossier source existe
@@ -46,7 +53,8 @@
       register: source_dir
       when: not skip_host | default(false)
 
-    - name: Copier les fichiers de config dans un répertoire temporaire lisible
+    # Pour les services distants
+    - name: Copier les fichiers de config dans un répertoire temporaire lisible (services distants)
       become: true
       shell: |
         set -e
@@ -67,27 +75,76 @@
       when:
         - not skip_host | default(false)
         - source_dir.stat.exists
+        - not is_local_service
 
-    - name: Vérifier la présence du répertoire backup
+    # Pour les services locaux
+    - name: Copier les fichiers de config directement (services locaux)
+      delegate_to: localhost
+      become: true
+      shell: |
+        set -e
+        export_dir="/tmp/backup_{{ service_name }}"
+        echo "[DEBUG] Création du dossier $export_dir"
+        mkdir -p "$export_dir"
+        echo "[DEBUG] Dossier de config : {{ config_path }}"
+        echo "[DEBUG] Fichiers matchés : {{ file_patterns | join(', ') }}"
+
+        echo "[DEBUG] Lancement de la copie..."
+        find {{ config_path }} -type f \( {% for ext in file_patterns %} -iname '{{ ext }}'{% if not loop.last %} -o {% endif %}{% endfor %} \) \
+          -exec cp --parents {} "$export_dir" \;
+
+        echo "[DEBUG] Terminé copie vers $export_dir"
+      register: backup_cp_result_local
+      when:
+        - not skip_host | default(false)
+        - source_dir.stat.exists
+        - is_local_service
+
+    - name: Vérifier la présence du répertoire backup (services distants)
       become: true
       stat:
         path: "/home/ansible/backup_{{ service_name }}"
       register: backup_folder_check
       when:
         - not skip_host | default(false)
+        - not is_local_service
 
-    - name: Afficher l'état du dossier backup
+    - name: Vérifier la présence du répertoire backup (services locaux)
+      delegate_to: localhost
+      become: true
+      stat:
+        path: "/tmp/backup_{{ service_name }}"
+      register: backup_folder_check_local
+      when:
+        - not skip_host | default(false)
+        - is_local_service
+
+    - name: Afficher l'état du dossier backup (services distants)
       debug:
         var: backup_folder_check
       when:
         - not skip_host | default(false)
+        - not is_local_service
 
-    - name: DEBUG - Affichage sortie de la copie
+    - name: Afficher l'état du dossier backup (services locaux)
+      debug:
+        var: backup_folder_check_local
+      when:
+        - not skip_host | default(false)
+        - is_local_service
+
+    - name: DEBUG - Affichage sortie de la copie (services distants)
       debug:
         var: backup_cp_result.stdout_lines
       when: backup_cp_result is defined
 
-    - name: Créer une archive locale avec tar
+    - name: DEBUG - Affichage sortie de la copie (services locaux)
+      debug:
+        var: backup_cp_result_local.stdout_lines
+      when: backup_cp_result_local is defined
+
+    # Pour les services distants
+    - name: Créer une archive locale avec tar (services distants)
       shell: |
         export_dir="/home/ansible/backup_{{ service_name }}"
         tmp_archive="/tmp/{{ service_name }}.tar.gz"
@@ -97,15 +154,49 @@
         else
           echo "Dossier vide ou inexistant: $export_dir"
         fi
-      when: not skip_host | default(false)
+      when: 
+        - not skip_host | default(false)
+        - not is_local_service
 
-    - name: Vérifier que l'archive a bien été créée
+    # Pour les services locaux
+    - name: Créer une archive locale avec tar (services locaux)
+      delegate_to: localhost
+      become: true
+      shell: |
+        export_dir="/tmp/backup_{{ service_name }}"
+        tmp_archive="/tmp/{{ service_name }}.tar.gz"
+        if [ -d "$export_dir" ] && [ "$(ls -A $export_dir)" ]; then
+          tar -czf "$tmp_archive" -C "$export_dir" .
+          echo "Archive créée: $tmp_archive"
+        else
+          echo "Dossier vide ou inexistant: $export_dir"
+        fi
+      when: 
+        - not skip_host | default(false)
+        - is_local_service
+
+    # Pour les services distants
+    - name: Vérifier que l'archive a bien été créée (services distants)
       stat:
         path: "/tmp/{{ service_name }}.tar.gz"
       register: archive_file
-      when: not skip_host | default(false)
+      when: 
+        - not skip_host | default(false)
+        - not is_local_service
 
-    - name: Créer le dossier final sur le serveur de monitoring
+    # Pour les services locaux
+    - name: Vérifier que l'archive a bien été créée (services locaux)
+      delegate_to: localhost
+      become: true
+      stat:
+        path: "/tmp/{{ service_name }}.tar.gz"
+      register: archive_file_local
+      when: 
+        - not skip_host | default(false)
+        - is_local_service
+
+    # Pour les services distants
+    - name: Créer le dossier final sur le serveur de monitoring (services distants)
       delegate_to: localhost
       become: true
       file:
@@ -116,7 +207,20 @@
         - not skip_host | default(false)
         - archive_file.stat.exists
 
-    - name: Copier l'archive vers le serveur de monitoring
+    # Pour les services locaux
+    - name: Créer le dossier final sur le serveur de monitoring (services locaux)
+      delegate_to: localhost
+      become: true
+      file:
+        path: "{{ dest_base }}/{{ service_name }}"
+        state: directory
+        mode: '0755'
+      when:
+        - not skip_host | default(false)
+        - archive_file_local.stat.exists
+
+    # Pour les services distants
+    - name: Copier l'archive vers le serveur de monitoring (services distants)
       fetch:
         src: "/tmp/{{ service_name }}.tar.gz"
         dest: "{{ dest_base }}/{{ service_name }}/"
@@ -125,7 +229,20 @@
         - not skip_host | default(false)
         - archive_file.stat.exists
 
-    - name: Extraire l'archive sur le serveur de monitoring
+    # Pour les services locaux
+    - name: Copier l'archive vers le dossier final (services locaux)
+      delegate_to: localhost
+      become: true
+      copy:
+        src: "/tmp/{{ service_name }}.tar.gz"
+        dest: "{{ dest_base }}/{{ service_name }}/"
+        remote_src: yes
+      when:
+        - not skip_host | default(false)
+        - archive_file_local.stat.exists
+
+    # Pour les services distants
+    - name: Extraire l'archive sur le serveur de monitoring (services distants)
       delegate_to: localhost
       become: true
       unarchive:
@@ -136,6 +253,19 @@
         - not skip_host | default(false)
         - archive_file.stat.exists
 
+    # Pour les services locaux
+    - name: Extraire l'archive sur le serveur de monitoring (services locaux)
+      delegate_to: localhost
+      become: true
+      unarchive:
+        src: "{{ dest_base }}/{{ service_name }}/{{ service_name }}.tar.gz"
+        dest: "{{ dest_base }}/{{ service_name }}"
+        remote_src: true
+      when:
+        - not skip_host | default(false)
+        - archive_file_local.stat.exists
+
+    # Pour les services distants
     - name: Nettoyer les fichiers temporaires sur les hôtes distants
       become: true
       file:
@@ -146,7 +276,20 @@
         - "/home/ansible/backup_{{ service_name }}"
       when: not skip_host | default(false)
 
-    - name: Nettoyer l'archive temporaire sur le serveur de monitoring
+    # Pour les services locaux
+    - name: Nettoyer les fichiers temporaires sur le serveur de monitoring (services locaux)
+      delegate_to: localhost
+      become: true
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - "/tmp/{{ service_name }}.tar.gz"
+        - "/tmp/backup_{{ service_name }}"
+      when: not skip_host | default(false)
+
+    # Nettoyage des archives temporaires sur le serveur de monitoring
+    - name: Nettoyer l'archive temporaire sur le serveur de monitoring (services distants)
       delegate_to: localhost
       become: true
       file:
@@ -155,3 +298,13 @@
       when:
         - not skip_host | default(false)
         - archive_file.stat.exists
+
+    - name: Nettoyer l'archive temporaire sur le serveur de monitoring (services locaux)
+      delegate_to: localhost
+      become: true
+      file:
+        path: "{{ dest_base }}/{{ service_name }}/{{ service_name }}.tar.gz"
+        state: absent
+      when:
+        - not skip_host | default(false)
+        - archive_file_local.stat.exists
