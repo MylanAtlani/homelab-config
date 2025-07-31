@@ -10,7 +10,7 @@
       traefik: /opt/traefik
       homarr: /opt/homarr
       adguard: /opt/adguardhome/conf
-      immich: /opt/immich
+      immich: /opt/immich/docker
       vaultwarden: /opt/vaultwarden
       jellyseer: /opt/jellyseer
       mealie: /opt/mealie
