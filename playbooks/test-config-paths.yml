@@ -13,7 +13,7 @@
       mealie: /opt/mealie
       grocy: /opt/grocy
       arrstack: /opt/appdata
-      paperless: /opt/paperless
+      paperless: /mnt/paperless_data
       prometheus: /opt/monitoring/prometheus
 
   tasks:
