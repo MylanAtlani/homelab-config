@@ -14,7 +14,7 @@
       grocy: /opt/grocy
       arrstack: /opt/appdata
       paperless: /opt/paperless
-      prometheus: /opt/prometheus
+      prometheus: /opt/monitoring/prometheus
 
   tasks:
     - name: Vérifier si l'hôte est dans la liste des services
