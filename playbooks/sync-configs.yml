@@ -69,6 +69,14 @@
 
         echo "[DEBUG] Lancement de la copie..."
         find {{ config_path }} -type f \( {% for ext in file_patterns %} -iname '{{ ext }}'{% if not loop.last %} -o {% endif %}{% endfor %} \) \
+          -not -path "*/\.*" \
+          -not -path "*/data/*" \
+          -not -path "*/node_modules/*" \
+          -not -path "*/vendor/*" \
+          -not -path "*/.git/*" \
+          -not -path "*/build/*" \
+          -not -path "*/dist/*" \
+          -not -path "*/target/*" \
           -exec cp --parents {} "$export_dir" \;
 
         echo "[DEBUG] Correction des permissions"
@@ -158,6 +166,26 @@
         src: "{{ dest_base }}/{{ service_name }}/{{ service_name }}.tar.gz"
         dest: "{{ dest_base }}/{{ service_name }}"
         remote_src: true
+      when:
+        - not skip_host | default(false)
+        - archive_file.stat.exists
+
+    # Réorganiser les fichiers pour qu'ils soient à la racine
+    - name: Réorganiser les fichiers à la racine du dossier
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd "{{ dest_base }}/{{ service_name }}"
+        # Trouver le premier niveau de dossiers et déplacer leur contenu
+        for dir in */; do
+          if [ -d "$dir" ]; then
+            echo "Déplacement du contenu de $dir vers la racine"
+            mv "$dir"* . 2>/dev/null || true
+            rmdir "$dir" 2>/dev/null || true
+          fi
+        done
+        # Supprimer les dossiers vides restants
+        find . -type d -empty -delete 2>/dev/null || true
       when:
         - not skip_host | default(false)
         - archive_file.stat.exists
