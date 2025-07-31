@@ -179,27 +179,16 @@
         cd "{{ dest_base }}/{{ service_name }}"
         echo "Réorganisation des fichiers..."
         
-        # Fonction récursive pour déplacer tous les fichiers vers la racine
-        move_files_to_root() {
-          local current_dir="$1"
-          local target_dir="$2"
-          
-          for item in "$current_dir"/*; do
-            if [ -f "$item" ]; then
-              # C'est un fichier, le déplacer vers la racine
-              echo "Déplacement de $item vers $target_dir"
-              mv "$item" "$target_dir/"
-            elif [ -d "$item" ]; then
-              # C'est un dossier, explorer récursivement
-              move_files_to_root "$item" "$target_dir"
-              # Supprimer le dossier vide
-              rmdir "$item" 2>/dev/null || true
-            fi
-          done
-        }
-        
-        # Commencer la réorganisation depuis le répertoire courant
-        move_files_to_root "." "."
+        # Supprimer seulement le premier niveau de dossiers (opt, mnt, etc.)
+        for dir in */; do
+          if [ -d "$dir" ]; then
+            echo "Déplacement du contenu de $dir vers la racine"
+            # Déplacer tout le contenu du dossier vers la racine
+            mv "$dir"* . 2>/dev/null || true
+            # Supprimer le dossier vide
+            rmdir "$dir" 2>/dev/null || true
+          fi
+        done
         
         # Supprimer les dossiers vides restants
         find . -type d -empty -delete 2>/dev/null || true
