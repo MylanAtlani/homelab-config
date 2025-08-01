@@ -219,3 +219,80 @@
       when:
         - not skip_host | default(false)
         - archive_file.stat.exists
+
+  # Tâches Git à exécuter après la synchronisation
+  post_tasks:
+    - name: Vérifier si des fichiers ont été modifiés
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        git status --porcelain
+      register: git_status
+      run_once: true
+
+    - name: Afficher le statut Git
+      debug:
+        var: git_status.stdout_lines
+      when: git_status.stdout_lines | length > 0
+
+    - name: Ajouter tous les fichiers modifiés au Git
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        git add .
+      when: git_status.stdout_lines | length > 0
+      run_once: true
+
+    - name: Créer le message de commit avec la date
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        echo "backup-$(date '+%Y-%m-%d %H:%M:%S')"
+      register: commit_message
+      when: git_status.stdout_lines | length > 0
+      run_once: true
+
+    - name: Commiter les changements
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        git commit -am "{{ commit_message.stdout }}"
+      when: git_status.stdout_lines | length > 0
+      run_once: true
+
+    - name: Vérifier si la branche backup existe
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        git branch -r | grep -q "origin/backup" || git checkout -b backup
+      when: git_status.stdout_lines | length > 0
+      run_once: true
+
+    - name: Basculer sur la branche backup
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        git checkout backup
+      when: git_status.stdout_lines | length > 0
+      run_once: true
+
+    - name: Pousser vers origin backup
+      delegate_to: localhost
+      become: true
+      shell: |
+        cd /opt/monitoring/homelab-config
+        git push origin backup
+      when: git_status.stdout_lines | length > 0
+      run_once: true
+
+    - name: Afficher le message de succès
+      debug:
+        msg: "Synchronisation terminée et changements poussés vers Git"
+      when: git_status.stdout_lines | length > 0
+      run_once: true
