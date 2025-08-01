@@ -1,0 +1,20 @@
+- name: Déployer le Portainer Agent sur tous les hôtes Docker
+  hosts: docker_hosts
+  become: true
+
+  tasks:
+    - name: Créer le volume Docker pour le Portainer Agent
+      docker_volume:
+        name: portainer_agent_data
+
+    - name: Lancer le conteneur Portainer Agent
+      docker_container:
+        name: portainer_agent
+        image: portainer/agent
+        state: started
+        restart_policy: always
+        published_ports:
+          - "9001:9001"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          - portainer_agent_data:/data
