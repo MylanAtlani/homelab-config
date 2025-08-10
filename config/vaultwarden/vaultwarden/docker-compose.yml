@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Paris
+      - WEBSOCKET_ENABLED=true
+      - SIGNUPS_ALLOWED=true     # true = création de comptes possible
+    volumes:
+      - ./vw-data:/data

@@ -1,0 +1,14 @@
+http:
+  routers:
+    homarr:
+      rule: "Host(`homarr.local`)"
+      entryPoints:
+        - websecure
+      service: homarr
+      tls: true
+
+  services:
+    homarr:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.3:7575"

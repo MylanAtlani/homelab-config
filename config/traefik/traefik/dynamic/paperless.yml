@@ -1,0 +1,14 @@
+http:
+  routers:
+    paperless:
+      rule: "Host(`paperless.local`)"
+      entryPoints:
+        - websecure
+      service: paperless
+      tls: true
+
+  services:
+    paperless:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.4:8000"

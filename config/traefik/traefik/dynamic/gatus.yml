@@ -1,0 +1,13 @@
+http:
+  routers:
+    gatus:
+      rule: "Host(`gatus.local`)"
+      entryPoints:
+        - websecure
+      service: gatus
+      tls: true
+  services:
+    gatus:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.11:8080"

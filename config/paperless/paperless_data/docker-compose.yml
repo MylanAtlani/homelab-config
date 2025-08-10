@@ -1,0 +1,37 @@
+services:
+  redis:
+    image: redis:7
+    restart: always
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: always
+    depends_on:
+      - db
+      - redis
+    ports:
+      - 8000:8000
+    environment:
+      PAPERLESS_URL: https://paperless.kalimink.fr
+      PAPERLESS_REDIS: redis://redis:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless
+      PAPERLESS_TIME_ZONE: Europe/Paris
+      PAPERLESS_SECRET_KEY: mPgfi3qNlBiukEqglMjS553tvqdriTEu
+    volumes:
+      - ./data:/usr/src/paperless/data
+      - ./media:/usr/src/paperless/media
+      - ./consume:/usr/src/paperless/consume
+      - ./export:/usr/src/paperless/export

@@ -1,0 +1,13 @@
+http:
+  routers:
+    grafana:
+      rule: "Host(`grafana.local`)"
+      entryPoints:
+        - websecure
+      service: grafana
+      tls: true
+  services:
+    grafana:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.11:3000"

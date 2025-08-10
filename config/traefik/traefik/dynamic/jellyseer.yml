@@ -1,0 +1,14 @@
+http:
+  routers:
+    jellyseer:
+      rule: "Host(`jellyseer.local`)"
+      entryPoints:
+        - websecure
+      service: jellyseer
+      tls: true
+
+  services:
+    jellyseer:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.7:5055"

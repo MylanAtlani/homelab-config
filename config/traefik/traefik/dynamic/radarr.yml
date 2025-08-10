@@ -1,0 +1,13 @@
+http:
+  routers:
+    radarr:
+      rule: "Host(`radarr.local`)"
+      entryPoints:
+        - websecure
+      service: radarr
+      tls: true
+  services:
+    radarr:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.5:7878"

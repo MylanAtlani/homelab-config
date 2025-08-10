@@ -1,0 +1,16 @@
+http:
+  routers:
+    vaultwarden:
+      rule: "Host(`vaultwarden.local`)"
+      entryPoints:
+        - websecure
+      service: vaultwarden
+      tls:
+        domains:
+          - main: "vaultwarden.local"
+
+  services:
+    vaultwarden:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.8:8222"  # ← ou l'IP du LXC Vaultwarden si différent

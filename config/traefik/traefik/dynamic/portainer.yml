@@ -1,0 +1,13 @@
+http:
+  routers:
+    portainer:
+      rule: "Host(`portainer.local`)"
+      entryPoints:
+        - websecure
+      service: portainer
+      tls: true
+  services:
+    portainer:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.11:9000"
