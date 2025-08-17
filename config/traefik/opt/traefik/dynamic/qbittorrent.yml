@@ -1,0 +1,13 @@
+http:
+  routers:
+    qbittorrent:
+      rule: "Host(`qbittorrent.local`)"
+      entryPoints:
+        - websecure
+      service: qbittorrent
+      tls: true
+  services:
+    qbittorrent:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.5:8080"

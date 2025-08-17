@@ -1,0 +1,14 @@
+http:
+  routers:
+    grocy:
+      rule: "Host(`grocy.local`)"
+      entryPoints:
+        - websecure
+      service: grocy
+      tls: true
+
+  services:
+    grocy:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.6:9283"

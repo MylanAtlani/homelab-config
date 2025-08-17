@@ -1,0 +1,13 @@
+http:
+  routers:
+    prometheus:
+      rule: "Host(`prometheus.local`)"
+      entryPoints:
+        - websecure
+      service: prometheus
+      tls: true
+  services:
+    prometheus:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.11:9090"

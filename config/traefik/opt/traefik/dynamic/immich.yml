@@ -1,0 +1,17 @@
+http:
+  routers:
+    immich:
+      rule: "Host(`immich.local`)"
+      entryPoints:
+        - websecure
+      service: immich
+      tls:
+        options: default
+        domains:
+          - main: "immich.local"
+
+  services:
+    immich:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.9:2283"

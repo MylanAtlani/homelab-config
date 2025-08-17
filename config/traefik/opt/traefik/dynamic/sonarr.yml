@@ -1,0 +1,13 @@
+http:
+  routers:
+    sonarr:
+      rule: "Host(`sonarr.local`)"
+      entryPoints:
+        - websecure
+      service: sonarr
+      tls: true
+  services:
+    sonarr:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.5:8989"

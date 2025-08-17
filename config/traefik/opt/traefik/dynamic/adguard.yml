@@ -1,0 +1,14 @@
+http:
+  routers:
+    adguard:
+      rule: "Host(`adguard.local`)"
+      entryPoints:
+        - websecure
+      service: adguard
+      tls: true
+
+  services:
+    adguard:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.2"

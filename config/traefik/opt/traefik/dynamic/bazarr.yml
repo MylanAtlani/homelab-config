@@ -1,0 +1,17 @@
+http:
+  routers:
+    bazarr:
+      rule: "Host(`bazarr.local`)"
+      entryPoints:
+        - websecure
+      service: bazarr
+      tls:
+        options: default
+        domains:
+          - main: "bazarr.local"
+
+  services:
+    bazarr:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.99.5:6767"

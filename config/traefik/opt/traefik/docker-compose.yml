@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:latest
+    container_name: traefik
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080" # dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - /opt/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./acme.json:/acme.json
+      - /opt/traefik/certs:/etc/traefik/certs
+    restart: unless-stopped
